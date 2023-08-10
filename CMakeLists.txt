@@ -101,12 +101,12 @@ if (ENABLE_SASL)
 endif ()
 
 # Fetch boost
-FetchContent_Declare(
-        boost
-        URL https://boostorg.jfrog.io/artifactory/main/release/1.75.0/source/boost_1_75_0.tar.gz
-        URL_MD5 38813f6feb40387dfe90160debd71251
-)
-FetchContent_MakeAvailable(boost)
+#FetchContent_Declare(
+#        boost
+#        URL https://boostorg.jfrog.io/artifactory/main/release/1.75.0/source/boost_1_75_0.tar.gz
+#        URL_MD5 38813f6feb40387dfe90160debd71251
+#)
+#FetchContent_MakeAvailable(boost)
 set(boost_include_dir ${boost_SOURCE_DIR})
 
 # Compile photon objects

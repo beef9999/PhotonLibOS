@@ -75,8 +75,8 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
         # Fetch liburing
         FetchContent_Declare(
                 liburing
-                GIT_REPOSITORY https://github.com/axboe/liburing.git
-                GIT_TAG 469b5e80ce42be53ec748ddea8523a3c16ea5465
+                GIT_REPOSITORY https://gitee.com/mirrors_axboe/liburing.git
+                GIT_TAG liburing-2.3
                 UPDATE_COMMAND ./configure
         )
         FetchContent_MakeAvailable(liburing)
@@ -90,6 +90,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
                 ${liburing_SOURCE_DIR}/src/syscall.c
         )
         target_compile_options(uring PRIVATE -Wno-implicit-function-declaration)
+        target_compile_definitions(uring PRIVATE _GNU_SOURCE LIBURING_INTERNAL)
         target_include_directories(uring PRIVATE ${liburing_include_dir})
     endif ()
 endif()

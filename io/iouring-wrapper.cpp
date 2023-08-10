@@ -241,7 +241,7 @@ public:
             LOG_ERROR_RETURN(0, -1, "iouring: event is either non-existent or one-shot finished");
         }
 
-        io_uring_prep_poll_remove(sqe, &iter->second.io_ctx);
+        io_uring_prep_poll_remove(sqe, (__u64) &iter->second.io_ctx);
         io_uring_sqe_set_data(sqe, nullptr);
         return 0;
     }

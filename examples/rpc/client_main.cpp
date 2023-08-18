@@ -13,80 +13,79 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
+#include <chrono>
 #include <gflags/gflags.h>
 #include <photon/common/alog-stdstring.h>
-#include <photon/io/signal.h>
 #include <photon/photon.h>
+#include <photon/thread/thread11.h>
+#include <photon/rpc/rpc.h>
+#include "protocol.h"
 
-#include "client.h"
 
-DEFINE_int32(port, 0, "server port");
+DEFINE_int32(port, 18888, "server port");
 DEFINE_string(host, "127.0.0.1", "server ip");
+DEFINE_int32(concurrency, 6, "concurrency");
+DEFINE_uint32(buf_size, 32768, "buf");
 
-static bool running = true;
-static photon::join_handle* heartbeat;
-static photon::net::EndPoint ep;
+uint64_t qps = 0;
+uint64_t duration = 0;
 
-void* heartbeat_thread(void* arg) {
-    auto client = (ExampleClient*)arg;
-    while (running) {
-        auto start = photon::now;
-        auto half = client->RPCHeartbeat(ep);
-        auto end = photon::now;
-        if (half > 0) {
-            LOG_INFO("single trip `us, round trip `us", half - start,
-                     end - start);
-        } else {
-            LOG_INFO("heartbeat failed in `us", end - start);
-        }
+static void run_latency_loop() {
+    while (true) {
         photon::thread_sleep(1);
+        uint64_t lat = (qps != 0) ? (duration / qps) : 0;
+        LOG_INFO("latency: ` us", lat);
+        qps = duration = 0;
     }
-    return nullptr;
 }
 
-void run_some_task(ExampleClient* client) {
-    auto echo = client->RPCEcho(ep, "Hello");
-    LOG_INFO(VALUE(echo));
+struct ExampleClient {
+    std::unique_ptr<photon::rpc::StubPool> pool;
 
-    IOVector iov;
-    char writebuf[] = "write data like pwrite";
-    iov.push_back(writebuf, sizeof(writebuf));
-    auto tmpfile = "/tmp/test_file_" + std::to_string(rand());
-    auto ret = client->RPCWrite(ep, tmpfile, iov.iovec(), iov.iovcnt());
-    LOG_INFO("Write to tmpfile ` ret=`", tmpfile, ret);
+    ExampleClient()
+            : pool(photon::rpc::new_stub_pool(-1, -1, -1)) {}
 
-    char readbuf[4096];
-    struct iovec iovrd {
-        .iov_base = readbuf, .iov_len = 4096,
-    };
-    ret = client->RPCRead(ep, tmpfile, &iovrd, 1);
-    LOG_INFO("Read from tmpfile ` ret=`", tmpfile, ret);
-    LOG_INFO(VALUE((char*)readbuf));
-    client->RPCTestrun(ep);
-}
+    ssize_t RPCRead(photon::net::EndPoint ep) {
+        auto stub = pool->get_stub(ep, false);
+        if (!stub) {
+            LOG_ERRNO_RETURN(0, -1, "fail to get stub");
+        }
+        std::string s = "1";
+        char buf[FLAGS_buf_size];
 
-void handle_term(int) {
-    running = false;
-    photon::thread_interrupt((photon::thread*)heartbeat);
-}
+        while (true) {
+            auto start = std::chrono::system_clock::now();
+            ReadBuffer::Request req;
+            req.buf.assign(buf, FLAGS_buf_size);
+            ReadBuffer::Response resp;
+            int ret = stub->call<ReadBuffer>(req, resp);
+            if (ret < 0) {
+                LOG_ERRNO_RETURN(0, -1, "read error ", VALUE(ret));
+            }
+            auto end = std::chrono::system_clock::now();
+            duration += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            qps++;
+        }
+        return 0;
+    }
+};
 
 int main(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    srand(time(NULL));
-    photon::init();
+
+    int ret = photon::init(photon::INIT_EVENT_EPOLL, photon::INIT_IO_NONE);
+    if (ret)
+        LOG_ERRNO_RETURN(0, -1, "error init");
     DEFER(photon::fini());
 
-    photon::sync_signal(SIGTERM, &handle_term);
-    photon::sync_signal(SIGINT, &handle_term);
-
     ExampleClient client;
-    ep = photon::net::EndPoint(photon::net::IPAddr(FLAGS_host.c_str()),
-                               FLAGS_port);
-    heartbeat = photon::thread_enable_join(
-        photon::thread_create(heartbeat_thread, &client));
-    run_some_task(&client);
-    photon::thread_join(heartbeat);
+    auto ep = photon::net::EndPoint(photon::net::IPAddr(FLAGS_host.c_str()), FLAGS_port);
 
-    return 0;
+    photon::thread_create11(run_latency_loop);
+
+    for (int32_t i = 0; i < FLAGS_concurrency; ++i) {
+        photon::thread_create11(&ExampleClient::RPCRead, &client, ep);
+    }
+
+    photon::thread_sleep(-1);
 }

@@ -6,10 +6,10 @@ target_link_libraries(simple-example PRIVATE photon_static)
 add_executable(net-perf perf/net-perf.cpp)
 target_link_libraries(net-perf PRIVATE photon_static)
 
-add_executable(rpc-example-client rpc/client.cpp rpc/client_main.cpp)
+add_executable(rpc-example-client rpc/client_main.cpp)
 target_link_libraries(rpc-example-client PRIVATE photon_static)
 
-add_executable(rpc-example-server rpc/server.cpp rpc/server_main.cpp)
+add_executable(rpc-example-server rpc/server_main.cpp)
 target_link_libraries(rpc-example-server PRIVATE photon_static)
 
 add_executable(sync-primitive sync-primitive/sync-primitive.cpp)

@@ -16,31 +16,72 @@ limitations under the License.
 
 #include <gflags/gflags.h>
 #include <photon/common/utility.h>
-#include <photon/io/signal.h>
+#include <photon/common/alog.h>
 #include <photon/photon.h>
+#include <photon/thread/thread11.h>
+#include <photon/rpc/rpc.h>
 
-#include "server.h"
+#include "protocol.h"
 
-DEFINE_int32(port, 0, "Server listen port, 0(default) for random port");
-std::unique_ptr<ExampleServer> rpcservice;
 
-void handle_null(int) {}
-void handle_term(int) { rpcservice.reset(); }
+DEFINE_int32(port, 18888, "Server listen port, 0(default) for random port");
+DEFINE_uint32(buf_size, 16384, "buf");
+
+struct ExampleServer {
+    std::unique_ptr<photon::rpc::Skeleton> skeleton;
+    std::unique_ptr<photon::net::ISocketServer> server;
+    uint64_t qps = 0;
+
+    ExampleServer()
+            : skeleton(photon::rpc::new_skeleton(65536U)),
+              server(photon::net::new_tcp_socket_server()) {
+        skeleton->register_service<ReadBuffer>(this);
+    }
+
+
+    int do_rpc_service(ReadBuffer::Request* req, ReadBuffer::Response* resp,
+                       IOVector* iov, IStream*) {
+        assert(req->buf.size() == (size_t) FLAGS_buf_size);
+        resp->buf.assign(req->buf.addr(), req->buf.length());
+        qps++;
+        return 0;
+    }
+
+    int serve(photon::net::ISocketStream* stream) {
+        return skeleton->serve(stream);
+    }
+
+    int run(int port) {
+        if (server->bind(port) < 0)
+            LOG_ERRNO_RETURN(0, -1, "Failed to bind port `", port)
+        if (server->listen() < 0) LOG_ERRNO_RETURN(0, -1, "Failed to listen");
+        server->set_handler({this, &ExampleServer::serve});
+        LOG_INFO("Started rpc server at `", server->getsockname());
+
+        photon::thread_create11(&ExampleServer::show_qps, this);
+
+        return server->start_loop(true);
+    }
+
+    void show_qps() {
+        while (true) {
+            photon::thread_sleep(1);
+            LOG_INFO(qps);
+            qps = 0;
+        }
+    }
+};
+
 
 int main(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    photon::init();
+    // int cmp;
+    // kernel_version_compare("5.15", cmp);
+    // int ev_engine = cmp >= 0 ? photon::INIT_EVENT_IOURING : photon::INIT_EVENT_EPOLL;
+    int ret = photon::init(photon::INIT_EVENT_EPOLL, photon::INIT_IO_NONE);
     DEFER(photon::fini());
 
-    photon::sync_signal(SIGPIPE, &handle_null);
-    photon::sync_signal(SIGTERM, &handle_term);
-    photon::sync_signal(SIGINT, &handle_term);
-    // start server
-
-    // construct rpcservice
-    rpcservice.reset(new ExampleServer());
-
-    rpcservice->run(FLAGS_port);
-
+    auto s = new ExampleServer();
+    s->run(FLAGS_port);
     return 0;
 }

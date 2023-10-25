@@ -15,5 +15,5 @@ jobs:
       - name: Create Pull Request
 
         run: |
-          gh --help
+          gh pr --help
           gh pr create -B main -H beef9999/minor02 --title 'Merge' --body 'Created by Github action'

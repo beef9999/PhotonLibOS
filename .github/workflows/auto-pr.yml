@@ -3,7 +3,7 @@ name: Auto Create Pull Request
 on:
   push:
     branches:
-      - 'beef9999/*'
+      - 'beef9999/minor-01'
 
 jobs:
   createPullRequest:
@@ -14,5 +14,5 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5.0.2
         with:
-          branch: rpc-perf
+          branch: beef9999/minor-02
           base: main

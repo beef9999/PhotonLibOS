@@ -11,10 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: sudo apt install git
-
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5.0.2
         with:
           branch: rpc-perf
-          base: master
+          base: main

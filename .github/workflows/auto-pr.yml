@@ -1,19 +1,24 @@
-name: Auto Create Pull Request
+name: Auto PR
 
 on:
   push:
     branches:
-      - 'beef9999/minor-01'
+      - 'release/*'
 
 jobs:
-  createPullRequest:
+  auto-pr:
     runs-on: ubuntu-latest
+
     env:
       GH_TOKEN: ${{ github.token }}
+
     steps:
       - uses: actions/checkout@v3
-      - name: Create Pull Request
+
+      - name: Create Pull Request to the next higher release
 
         run: |
-          gh pr create --help
-          gh pr create -B main -H beef9999/minor-02 --title 'Merge' --body 'Created by Github action'
+          BRANCHES=$(git branch -r | grep 'release/' | cut -d '/' -f 3 | sort -V)
+          echo ${GITHUB_REF}
+          exit 1
+          # gh pr create -B main -H beef9999/minor-02 --title 'Merge' --body 'Created by Github action'

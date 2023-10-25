@@ -16,4 +16,4 @@ jobs:
 
         run: |
           gh pr create --help
-          gh pr create -B main -H beef9999/minor02 --title 'Merge' --body 'Created by Github action'
+          gh pr create -B main -H beef9999/minor-02 --title 'Merge' --body 'Created by Github action'

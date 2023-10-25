@@ -24,6 +24,7 @@ jobs:
           NUM=$(echo "$ME_AND_MY_NEXT" | wc -l)
           echo $NUM
           echo "$ME_AND_MY_NEXT"
+          echo "$RELEASE_VERSIONS"
           if (( NUM > 1 )); then
             NEXT_VERSION=$(echo "$ME_AND_MY_NEXT" | tail -n 1)
             gh pr create -B "release/$NEXT_VERSION" -H "release/$CURRENT_VERSION" --title 'Merge' --body 'Created by Github action'

@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: apt install git
+      - run: sudo apt install git
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5.0.2

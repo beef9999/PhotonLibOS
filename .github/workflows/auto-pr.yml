@@ -15,19 +15,20 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Create Pull Request to the next higher release
+      - name: Create Pull Request to the next higher release version
 
-        run: |
-          set -x
+        run: |        
           git fetch
           RELEASE_VERSIONS=$(git branch -r | grep 'release/' | cut -d '/' -f 3 | sort -V)
           CURRENT_VERSION=$(echo $GITHUB_REF | rev | cut -d '/' -f 1 | rev)
           ME_AND_MY_NEXT=$(echo "$RELEASE_VERSIONS" | grep -w $CURRENT_VERSION -A 1)
-          NUM=$(echo "$ME_AND_MY_NEXT" | wc -l)
-          echo $NUM
-          echo "$ME_AND_MY_NEXT"
-          echo "$RELEASE_VERSIONS"
+          NUM=$(echo "$ME_AND_MY_NEXT" | wc -l)        
           if (( NUM > 1 )); then
             NEXT_VERSION=$(echo "$ME_AND_MY_NEXT" | tail -n 1)
-            gh pr create -B "release/$NEXT_VERSION" -H "release/$CURRENT_VERSION" --title 'Merge' --body 'Created by Github action'
+            set -x
+            gh pr create --base "release/$NEXT_VERSION" --head "release/$CURRENT_VERSION" \
+                --title "Auto Merge from release/$CURRENT_VERSION to release/$NEXT_VERSION" \
+                --body 'Created by Github action'
+          else
+            echo "No more higher release versions"
           fi

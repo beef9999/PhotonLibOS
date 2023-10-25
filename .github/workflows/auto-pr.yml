@@ -2,8 +2,8 @@ name: Auto PR
 
 on:
   push:
-    branches:
-      - 'release/*'
+#    branches:
+#      - 'release/*'
 
 jobs:
   auto-pr:

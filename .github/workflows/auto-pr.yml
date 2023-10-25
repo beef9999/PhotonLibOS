@@ -13,5 +13,4 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Create Pull Request
-
         run: gh pr create -B main -H beef9999/minor02 --title 'Merge' --body 'Created by Github action'

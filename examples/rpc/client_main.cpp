@@ -50,9 +50,7 @@ struct ExampleClient {
         if (!stub) {
             LOG_ERRNO_RETURN(0, -1, "fail to get stub");
         }
-        std::string s = "1";
         char buf[FLAGS_buf_size];
-
         while (true) {
             auto start = std::chrono::system_clock::now();
             ReadBuffer::Request req;
@@ -72,8 +70,10 @@ struct ExampleClient {
 
 int main(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-
-    int ret = photon::init(photon::INIT_EVENT_EPOLL, photon::INIT_IO_NONE);
+    int cmp;
+    kernel_version_compare("5.15", cmp);
+    int ev_engine = cmp >= 0 ? photon::INIT_EVENT_IOURING : photon::INIT_EVENT_EPOLL;
+    int ret = photon::init(ev_engine, photon::INIT_IO_NONE);
     if (ret)
         LOG_ERRNO_RETURN(0, -1, "error init");
     DEFER(photon::fini());

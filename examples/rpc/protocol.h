@@ -30,9 +30,8 @@ struct ReadBuffer {
     };
 
     struct Response : public photon::rpc::Message {
-        uint64_t ret;
-
-        PROCESS_FIELDS(ret);
+        photon::rpc::buffer buf;
+        PROCESS_FIELDS(buf);
     };
 };
 

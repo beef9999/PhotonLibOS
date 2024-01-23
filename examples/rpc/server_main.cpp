@@ -42,7 +42,7 @@ struct ExampleServer {
     int do_rpc_service(ReadBuffer::Request* req, ReadBuffer::Response* resp,
                        IOVector* iov, IStream*) {
         assert(req->buf.size() == (size_t) FLAGS_buf_size);
-        resp->ret = 1;
+        resp->buf.assign(req->buf.addr(), req->buf.length());
         qps++;
         return 0;
     }
@@ -75,7 +75,10 @@ struct ExampleServer {
 
 int main(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    photon::init(photon::INIT_EVENT_EPOLL, photon::INIT_IO_NONE);
+    int cmp;
+    kernel_version_compare("5.15", cmp);
+    int ev_engine = cmp >= 0 ? photon::INIT_EVENT_IOURING : photon::INIT_EVENT_EPOLL;
+    int ret = photon::init(ev_engine, photon::INIT_IO_NONE);
     DEFER(photon::fini());
 
     auto s = new ExampleServer();

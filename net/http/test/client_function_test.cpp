@@ -514,6 +514,19 @@ TEST(http_client, partial_body) {
     EXPECT_EQ(true, buf == "http_clien");
 }
 
+// Server Name Indication (SNI) for SSL
+TEST(http_client, SNI) {
+    auto tls = photon::net::new_tls_context();
+    DEFER(delete tls);
+    auto client = http::new_http_client(nullptr, tls);
+    DEFER(delete client);
+    auto op = client->new_operation(http::Verb::GET, "https://debug.fly.dev");
+    DEFER(delete op);
+    op->retry = 0;
+    int res = op->call();
+    ASSERT_EQ(0, res);
+}
+
 TEST(DISABLED_http_client, ipv6) {  // make sure runing in a ipv6-ready environment
     auto client = new_http_client();
     DEFER(delete client);

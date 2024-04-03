@@ -16,6 +16,7 @@ limitations under the License.
 
 #include <gflags/gflags.h>
 #include <photon/common/utility.h>
+#include <photon/common/io-alloc.h>
 #include <photon/common/alog.h>
 #include <photon/photon.h>
 #include <photon/thread/thread11.h>
@@ -31,18 +32,21 @@ struct ExampleServer {
     std::unique_ptr<photon::rpc::Skeleton> skeleton;
     std::unique_ptr<photon::net::ISocketServer> server;
     uint64_t qps = 0;
+    PooledAllocator<1024*1024, 655360> alloc;
 
     ExampleServer()
-            : skeleton(photon::rpc::new_skeleton(65536U)),
+            : skeleton(photon::rpc::new_skeleton(655360U)),
               server(photon::net::new_tcp_socket_server()) {
         skeleton->register_service<ReadBuffer>(this);
+        skeleton->set_allocator(alloc.get_io_alloc());
     }
 
 
     int do_rpc_service(ReadBuffer::Request* req, ReadBuffer::Response* resp,
                        IOVector* iov, IStream*) {
-        assert(req->buf.size() == (size_t) FLAGS_buf_size);
-        resp->buf.assign(req->buf.addr(), req->buf.length());
+        iov->push_back(FLAGS_buf_size);
+        void* buf = iov->iovec()[0].iov_base;
+        resp->buf.assign(buf, FLAGS_buf_size);
         qps++;
         return 0;
     }
@@ -52,9 +56,11 @@ struct ExampleServer {
     }
 
     int run(int port) {
-        if (server->bind(port) < 0)
+        // std::string ep = std::string("0.0.0.0:") + std::to_string(FLAGS_port);
+        if (server->bind(FLAGS_port) < 0)
             LOG_ERRNO_RETURN(0, -1, "Failed to bind port `", port)
         if (server->listen() < 0) LOG_ERRNO_RETURN(0, -1, "Failed to listen");
+        server->setsockopt<int>(SOL_SOCKET, SO_REUSEPORT, 1);
         server->set_handler({this, &ExampleServer::serve});
         LOG_INFO("Started rpc server at `", server->getsockname());
 
@@ -75,10 +81,11 @@ struct ExampleServer {
 
 int main(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    // int cmp;
-    // kernel_version_compare("5.15", cmp);
-    // int ev_engine = cmp >= 0 ? photon::INIT_EVENT_IOURING : photon::INIT_EVENT_EPOLL;
-    int ret = photon::init(photon::INIT_EVENT_EPOLL, photon::INIT_IO_NONE);
+    set_log_output_level(ALOG_INFO);
+    int cmp;
+    kernel_version_compare("5.15", cmp);
+    int ev_engine = cmp >= 0 ? photon::INIT_EVENT_IOURING : photon::INIT_EVENT_EPOLL;
+    int ret = photon::init(ev_engine, photon::INIT_IO_NONE);
     DEFER(photon::fini());
 
     auto s = new ExampleServer();

@@ -54,7 +54,8 @@ struct ExampleClient {
         while (true) {
             auto start = std::chrono::system_clock::now();
             ReadBuffer::Request req;
-            req.buf.assign(buf, FLAGS_buf_size);
+            // TODO: choose to send buf or not
+            // req.buf.assign(buf, FLAGS_buf_size);
             ReadBuffer::Response resp;
             int ret = stub->call<ReadBuffer>(req, resp);
             if (ret < 0) {
@@ -70,10 +71,10 @@ struct ExampleClient {
 
 int main(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    // int cmp;
-    // kernel_version_compare("5.15", cmp);
-    // int ev_engine = cmp >= 0 ? photon::INIT_EVENT_IOURING : photon::INIT_EVENT_EPOLL;
-    int ret = photon::init(photon::INIT_EVENT_EPOLL, photon::INIT_IO_NONE);
+    int cmp;
+    kernel_version_compare("5.15", cmp);
+    int ev_engine = cmp >= 0 ? photon::INIT_EVENT_IOURING : photon::INIT_EVENT_EPOLL;
+    int ret = photon::init(ev_engine, photon::INIT_IO_NONE);
     if (ret)
         LOG_ERRNO_RETURN(0, -1, "error init");
     DEFER(photon::fini());

@@ -21,7 +21,6 @@ limitations under the License.
 #include <photon/photon.h>
 #include <photon/thread/thread11.h>
 #include <photon/rpc/rpc.h>
-
 #include "protocol.h"
 
 
@@ -34,8 +33,8 @@ struct ExampleServer {
     uint64_t qps = 0;
     PooledAllocator<1024*1024, 655360> alloc;
 
-    ExampleServer()
-            : skeleton(photon::rpc::new_skeleton(655360U)),
+    ExampleServer() :
+            skeleton(photon::rpc::new_skeleton(655360U)),
               server(photon::net::new_tcp_socket_server()) {
         skeleton->register_service<ReadBuffer>(this);
         skeleton->set_allocator(alloc.get_io_alloc());
@@ -82,10 +81,8 @@ struct ExampleServer {
 int main(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     set_log_output_level(ALOG_INFO);
-    int cmp;
-    kernel_version_compare("5.15", cmp);
-    int ev_engine = cmp >= 0 ? photon::INIT_EVENT_IOURING : photon::INIT_EVENT_EPOLL;
-    int ret = photon::init(ev_engine, photon::INIT_IO_NONE);
+    int ret = photon::init(photon::INIT_EVENT_EPOLL, photon::INIT_IO_NONE);
+    if (ret) exit(1);
     DEFER(photon::fini());
 
     auto s = new ExampleServer();

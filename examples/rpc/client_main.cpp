@@ -42,8 +42,8 @@ static void run_latency_loop() {
 struct ExampleClient {
     std::unique_ptr<photon::rpc::StubPool> pool;
 
-    ExampleClient()
-            : pool(photon::rpc::new_stub_pool(-1, -1, -1)) {}
+    ExampleClient() :
+            pool(photon::rpc::new_stub_pool(-1, -1, -1)) {}
 
     ssize_t RPCRead(photon::net::EndPoint ep) {
         auto stub = pool->get_stub(ep, false);
@@ -54,9 +54,8 @@ struct ExampleClient {
         while (true) {
             auto start = std::chrono::system_clock::now();
             ReadBuffer::Request req;
-            // TODO: choose to send buf or not
-            // req.buf.assign(buf, FLAGS_buf_size);
             ReadBuffer::Response resp;
+            resp.buf.assign(buf, FLAGS_buf_size);
             int ret = stub->call<ReadBuffer>(req, resp);
             if (ret < 0) {
                 LOG_ERRNO_RETURN(0, -1, "read error ", VALUE(ret));
@@ -71,12 +70,8 @@ struct ExampleClient {
 
 int main(int argc, char** argv) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    int cmp;
-    kernel_version_compare("5.15", cmp);
-    int ev_engine = cmp >= 0 ? photon::INIT_EVENT_IOURING : photon::INIT_EVENT_EPOLL;
-    int ret = photon::init(ev_engine, photon::INIT_IO_NONE);
-    if (ret)
-        LOG_ERRNO_RETURN(0, -1, "error init");
+    int ret = photon::init(photon::INIT_EVENT_EPOLL, photon::INIT_IO_NONE);
+    if (ret) exit(1);
     DEFER(photon::fini());
 
     ExampleClient client;

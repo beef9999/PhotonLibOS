@@ -164,7 +164,7 @@ TEST(Throttle, try_consume) {
              DEC(failure).comma(true));
     EXPECT_LT(count, 11000UL);
 }
-
+#undef __APPLE__
 ////////////////////////////////////////
 // The sleep and semaphore in macOS is less efficient and always cause variance, so skip macOS
 #ifndef __APPLE__
@@ -250,6 +250,8 @@ struct PriorityTestSuite {
 };
 
 class ThrottlePriorityTest : public testing::TestWithParam<PriorityTestSuite> {
+protected:
+    std::atomic<bool> running_{true};
 };
 
 INSTANTIATE_TEST_P(Throttle, ThrottlePriorityTest, testing::Values(
@@ -336,29 +338,15 @@ static void run_real_socket(const std::shared_ptr<std::atomic<bool>>& running, c
     ASSERT_NE(nullptr, server);
     DEFER(delete server);
 
-    auto handler = [&, _running=running](photon::net::ISocketStream* sock) -> int {
+    auto handler = [&](photon::net::ISocketStream* sock) -> int {
         char buf[buf_size];
-        while (_running->load()) {
+        while (running) {
             ssize_t ret = sock->recv(buf, buf_size);
             if (ret <= 0) break;
             photon::thread_yield();
         }
         return 0;
     };
-
-    // photon::thread_create11([&] {
-    //     int ret;
-    //     ret = server->setsockopt<int>(SOL_SOCKET, SO_REUSEPORT, 1);
-    //     if (ret) exit(1);
-    //     server->set_handler(handler);
-    //     ret = server->bind_v4any(0);
-    //     if (ret) exit(1);
-    //     ret = server->listen();
-    //     if (ret) exit(1);
-    //     ret = server->start_loop(true);
-    //     if (ret) exit(1);
-    // });
-    // photon::thread_usleep(10'000);
 
     int ret = server->setsockopt<int>(SOL_SOCKET, SO_REUSEPORT, 1);
     ASSERT_EQ(0, ret);
@@ -375,13 +363,13 @@ static void run_real_socket(const std::shared_ptr<std::atomic<bool>>& running, c
     ASSERT_NE(nullptr, cli);
     DEFER(delete cli);
 
-    auto client_th1 = photon::thread_create11([&, _running=running] {
+    auto client_th1 = photon::thread_create11([&] {
         photon::throttle src(p.io1.bw);
         auto conn = cli->connect(server_ep);
         if (!conn) exit(1);
         DEFER(delete conn);
         char buf[buf_size] = {};
-        while (_running->load()) {
+        while (running) {
             src.consume(p.io1.bs);
             ssize_t ret = conn->send(buf, p.io1.bs);
             if (ret <= 0) break;
@@ -391,13 +379,13 @@ static void run_real_socket(const std::shared_ptr<std::atomic<bool>>& running, c
     });
     thread_enable_join(client_th1);
 
-    auto client_th2 = photon::thread_create11([&, _running=running] {
+    auto client_th2 = photon::thread_create11([&] {
         photon::throttle src(p.io2.bw);
         auto conn = cli->connect(server_ep);
         if (!conn) exit(1);
         DEFER(delete conn);
         char buf[buf_size] = {};
-        while (_running->load()) {
+        while (running) {
             src.consume(p.io2.bs);
             ssize_t ret = conn->send(buf, p.io2.bs);
             if (ret <= 0) break;
@@ -411,22 +399,22 @@ static void run_real_socket(const std::shared_ptr<std::atomic<bool>>& running, c
     photon::thread_join((photon::join_handle*) client_th2);
 }
 
-static void run_simulate(const std::shared_ptr<std::atomic<bool>>& running, const PriorityTestSuite& p,
+static void run_simulate(const std::atomic<bool>& running, const PriorityTestSuite& p,
                          uint64_t& bw1, uint64_t& bw2) {
     photon::throttle t(p.limit_bw);
     photon::semaphore sem;
-    photon::thread_create11([&, _running=running] {
+    photon::thread_create11([&] {
         uint64_t sleep_interval = 1'000'000UL / (p.io1.bw / p.io1.bs);
-        while (_running->load()) {
+        while (running) {
             photon::thread_usleep(sleep_interval);
             t.consume(p.io1.bs, p.io1.prio);
             bw1 += p.io1.bs;
         }
         sem.signal(1);
     });
-    photon::thread_create11([&, _running=running] {
+    photon::thread_create11([&] {
         uint64_t sleep_interval = 1'000'000UL / (p.io2.bw / p.io2.bs);
-        while (_running->load()) {
+        while (running) {
             photon::thread_usleep(sleep_interval);
             t.consume(p.io2.bs, p.io2.prio);
             bw2 += p.io2.bs;
@@ -441,16 +429,15 @@ TEST_P(ThrottlePriorityTest, run) {
     const uint64_t test_time_sec = 10;
     uint64_t bw1 = 0, bw2 = 0;
 
-    auto running = std::make_shared<std::atomic<bool>>(true);
-    std::thread watcher([&, _running=running] {
+    std::thread watcher([&] {
         ::sleep(test_time_sec);
-        _running->store(false);
+        running_ = false;
     });
 
     if (p.type == PriorityTestSuite::Simulate)
-        run_simulate(running, p, bw1, bw2);
+        run_simulate(running_, p, bw1, bw2);
     else if (p.type == PriorityTestSuite::RealSocket)
-        run_real_socket(running, p, bw1, bw2);
+        run_real_socket(running_, p, bw1, bw2);
 
     bw1 /= test_time_sec;
     bw2 /= test_time_sec;

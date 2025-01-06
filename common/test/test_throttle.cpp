@@ -346,19 +346,29 @@ static void run_real_socket(const std::shared_ptr<std::atomic<bool>>& running, c
         return 0;
     };
 
-    photon::thread_create11([&] {
-        int ret;
-        ret = server->setsockopt<int>(SOL_SOCKET, SO_REUSEPORT, 1);
-        if (ret) exit(1);
-        server->set_handler(handler);
-        ret = server->bind_v4any(0);
-        if (ret) exit(1);
-        ret = server->listen();
-        if (ret) exit(1);
-        ret = server->start_loop(true);
-        if (ret) exit(1);
-    });
-    photon::thread_usleep(10'000);
+    // photon::thread_create11([&] {
+    //     int ret;
+    //     ret = server->setsockopt<int>(SOL_SOCKET, SO_REUSEPORT, 1);
+    //     if (ret) exit(1);
+    //     server->set_handler(handler);
+    //     ret = server->bind_v4any(0);
+    //     if (ret) exit(1);
+    //     ret = server->listen();
+    //     if (ret) exit(1);
+    //     ret = server->start_loop(true);
+    //     if (ret) exit(1);
+    // });
+    // photon::thread_usleep(10'000);
+
+    int ret = server->setsockopt<int>(SOL_SOCKET, SO_REUSEPORT, 1);
+    ASSERT_EQ(0, ret);
+    server->set_handler(handler);
+    ret = server->bind_v4any(0);
+    ASSERT_EQ(0, ret);
+    ret = server->listen();
+    ASSERT_EQ(0, ret);
+    ret = server->start_loop(false);
+    ASSERT_EQ(0, ret);
 
     auto server_ep = server->getsockname();
     auto cli = photon::net::new_tcp_socket_client();

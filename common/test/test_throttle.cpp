@@ -442,9 +442,9 @@ TEST_P(ThrottlePriorityTest, run) {
     uint64_t bw1 = 0, bw2 = 0;
 
     auto running = std::make_shared<std::atomic<bool>>(true);
-    std::thread watcher([&] {
+    std::thread watcher([&, _running=running] {
         ::sleep(test_time_sec);
-        running->store(false);
+        _running->store(false);
     });
 
     if (p.type == PriorityTestSuite::Simulate)

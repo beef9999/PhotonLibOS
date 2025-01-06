@@ -330,7 +330,7 @@ INSTANTIATE_TEST_P(Throttle, ThrottlePriorityTest, testing::Values(
         }
 ));
 
-static void run_real_socket(const std::shared_ptr<std::atomic<bool>>& running, const PriorityTestSuite& p,
+static void run_real_socket(const std::atomic<bool>& running, const PriorityTestSuite& p,
                             uint64_t& bw1, uint64_t& bw2) {
     photon::throttle t(p.limit_bw);
     uint64_t buf_size = std::max(p.io1.bs, p.io2.bs);

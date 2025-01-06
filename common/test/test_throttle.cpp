@@ -360,18 +360,17 @@ static void run_real_socket(const std::shared_ptr<std::atomic<bool>>& running, c
     });
     photon::thread_usleep(10'000);
 
-    photon::semaphore sem;
     auto server_ep = server->getsockname();
     auto cli = photon::net::new_tcp_socket_client();
     ASSERT_NE(nullptr, cli);
     DEFER(delete cli);
 
-    photon::thread_create11([&, _running=running] {
+    auto client_th1 = photon::thread_create11([&, _running=running] {
         photon::throttle src(p.io1.bw);
         auto conn = cli->connect(server_ep);
         if (!conn) exit(1);
         DEFER(delete conn);
-        char buf[buf_size];
+        char buf[buf_size] = {};
         while (_running->load()) {
             src.consume(p.io1.bs);
             ssize_t ret = conn->send(buf, p.io1.bs);
@@ -379,14 +378,15 @@ static void run_real_socket(const std::shared_ptr<std::atomic<bool>>& running, c
             bw1 += p.io1.bs;
             t.consume(p.io1.bs, p.io1.prio);
         }
-        sem.signal(1);
     });
-    photon::thread_create11([&, _running=running] {
+    thread_enable_join(client_th1);
+
+    auto client_th2 = photon::thread_create11([&, _running=running] {
         photon::throttle src(p.io2.bw);
         auto conn = cli->connect(server_ep);
         if (!conn) exit(1);
         DEFER(delete conn);
-        char buf[buf_size];
+        char buf[buf_size] = {};
         while (_running->load()) {
             src.consume(p.io2.bs);
             ssize_t ret = conn->send(buf, p.io2.bs);
@@ -394,9 +394,11 @@ static void run_real_socket(const std::shared_ptr<std::atomic<bool>>& running, c
             bw2 += p.io2.bs;
             t.consume(p.io2.bs, p.io2.prio);
         }
-        sem.signal(1);
     });
-    sem.wait(2);
+    thread_enable_join(client_th2);
+
+    photon::thread_join((photon::join_handle*) client_th1);
+    photon::thread_join((photon::join_handle*) client_th2);
 }
 
 static void run_simulate(const std::shared_ptr<std::atomic<bool>>& running, const PriorityTestSuite& p,
@@ -430,10 +432,10 @@ TEST_P(ThrottlePriorityTest, run) {
     uint64_t bw1 = 0, bw2 = 0;
 
     auto running = std::make_shared<std::atomic<bool>>(true);
-    std::thread([&] {
+    std::thread watcher([&] {
         ::sleep(test_time_sec);
         running->store(false);
-    }).detach();
+    });
 
     if (p.type == PriorityTestSuite::Simulate)
         run_simulate(running, p, bw1, bw2);
@@ -449,6 +451,8 @@ TEST_P(ThrottlePriorityTest, run) {
     GTEST_ASSERT_LE(ratio1, p.bw1_ratio_max);
     GTEST_ASSERT_GE(ratio2, p.bw2_ratio_min);
     GTEST_ASSERT_LE(ratio2, p.bw2_ratio_max);
+
+    watcher.join();
 }
 #endif
 

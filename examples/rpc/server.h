@@ -17,9 +17,17 @@ limitations under the License.
 #pragma once
 
 #include <photon/net/socket.h>
+#include <photon/thread/workerpool.h>
 #include <photon/rpc/rpc.h>
+#include <photon/common/io-alloc.h>
 
 #include "protocol.h"
+
+#include <gflags/gflags.h>
+
+#include <memory>
+DECLARE_int32(cpu_num);
+DECLARE_int32(buf_size);
 
 // Generally, RPC server contains with socket server, which provides
 // data stream to deleiver RPC data;
@@ -27,12 +35,16 @@ limitations under the License.
 struct ExampleServer {
     std::unique_ptr<photon::rpc::Skeleton> skeleton;
     std::unique_ptr<photon::net::ISocketServer> server;
+    std::unique_ptr<photon::WorkPool> work_pool;
 
     ExampleServer()
         : skeleton(photon::rpc::new_skeleton()),
           server(photon::net::new_tcp_socket_server()) {
         skeleton->register_service<Testrun, Heartbeat, Echo, ReadBuffer,
-                                   WriteBuffer>(this);
+                                   WriteBuffer, RPCProto>(this);
+        auto alloc = new PooledAllocator<1024 * 1024, 512>();
+        skeleton->set_allocator(alloc->get_io_alloc());
+        work_pool = std::make_unique<photon::WorkPool>(FLAGS_cpu_num, 1, 0, 0);
     }
 
     // public methods named `do_rpc_service` takes rpc requests
@@ -57,8 +69,12 @@ struct ExampleServer {
     int do_rpc_service(WriteBuffer::Request* req, WriteBuffer::Response* resp,
                        IOVector* iov, IStream*);
 
+    int do_rpc_service(RPCProto::Request* req, RPCProto::Response* resp,
+                       IOVector* iov, IStream*);
+
     // Serve provides handler for socket server
     int serve(photon::net::ISocketStream* stream) {
+        work_pool->thread_migrate();
         return skeleton->serve(stream);
     }
 

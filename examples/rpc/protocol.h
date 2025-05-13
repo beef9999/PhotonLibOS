@@ -167,3 +167,20 @@ struct WriteBuffer : public ExampleInterface {
         PROCESS_FIELDS(ret);
     };
 };
+
+struct RPCProto {
+    const static uint32_t IID = 0x1;
+    const static uint32_t FID = 0x2;
+
+    struct Request : public photon::rpc::Message {
+        photon::rpc::buffer buf;
+
+        PROCESS_FIELDS(buf);
+    };
+
+    struct Response : public photon::rpc::Message {
+        photon::rpc::buffer buf;
+
+        PROCESS_FIELDS(buf);
+    };
+};

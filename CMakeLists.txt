@@ -309,8 +309,6 @@ endif ()
 set(static_deps
         easy_weak
         fstack_weak
-        ${OPENSSL_LIBRARIES}
-        ${ZLIB_LIBRARIES}
 )
 set(shared_deps
         -lpthread
@@ -349,6 +347,7 @@ if (PHOTON_BUILD_OCF_CACHE)
     list(APPEND shared_deps ocf_cache_lib)
     list(APPEND static_deps ocf_cache_lib)
 endif()
+list(APPEND static_deps ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES})
 
 
 # Find out dynamic libs and append to `shared_deps`.
@@ -418,6 +417,9 @@ else ()
             VERBATIM
     )
 endif ()
+
+add_executable(my_cpp my.cpp)
+target_link_libraries(my_cpp photon_shared)
 
 # Build examples and test cases
 if (PHOTON_BUILD_TESTING)

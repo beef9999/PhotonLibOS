@@ -93,6 +93,13 @@ int ExampleServer::do_rpc_service(WriteBuffer::Request* req,
     return 0;
 }
 
+int ExampleServer::do_rpc_service(RPCProto::Request* req, RPCProto::Response* resp,
+                   IOVector* iov, IStream*) {
+    iov->push_back(FLAGS_buf_size);
+    resp->buf.assign(iov->iovec()[0].iov_base, iov->iovec()[0].iov_len);
+    return 0;
+}
+
 int ExampleServer::run(int port) {
     if (server->bind_v4any(port) < 0)
         LOG_ERRNO_RETURN(0, -1, "Failed to bind port `", port)

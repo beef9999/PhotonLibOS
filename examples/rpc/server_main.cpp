@@ -24,6 +24,8 @@ limitations under the License.
 #include "server.h"
 
 DEFINE_int32(port, 0, "Server listen port, 0(default) for random port");
+DEFINE_int32(cpu_num, 8, "Server CPU num");
+DEFINE_int32(buf_size, 4096, "IO buf size");
 std::unique_ptr<ExampleServer> rpcservice;
 
 void handle_null(int) {}
@@ -35,9 +37,9 @@ int main(int argc, char** argv) {
     photon::init();
     DEFER(photon::fini());
 
-    photon::sync_signal(SIGPIPE, &handle_null);
-    photon::sync_signal(SIGTERM, &handle_term);
-    photon::sync_signal(SIGINT, &handle_term);
+    // photon::sync_signal(SIGPIPE, &handle_null);
+    // photon::sync_signal(SIGTERM, &handle_term);
+    // photon::sync_signal(SIGINT, &handle_term);
 
     // construct rpcservice
     rpcservice.reset(new ExampleServer());
